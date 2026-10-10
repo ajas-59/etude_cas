@@ -1,4 +1,6 @@
-# Cas d'étude : https://www.saucedemo.com/ grâce à Playwright.
+# Cas d'étude : saucedemo.com avec Playwright
+
+Site étudié : https://www.saucedemo.com/
 
 ## Démarche
 
