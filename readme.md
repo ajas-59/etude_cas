@@ -1,38 +1,58 @@
 # Cas d'étude : https://www.saucedemo.com/ grâce à Playwright.
 
-## Etude des fonctionalités et cas
-Pour systématiquement comprendre l'ensemble des fonctionnalités et les chemins utilisateurs possibles nous avons commencé par trier les résultats attendus selon ces 3 fonctionnalités :
+## Démarche
 
-1) Connexion de l'utilisateur au site
-2) Utilisation du panier
-3) Paiement
+### Identification des fonctionnalités
 
-Nous avons alors trié selon différentes types de situations :
-- a) les cas où l'utilisateur a un comportement normal mais que le résultat attendu n'est pas retrouvé
-- b) les cas où l'utilisateur à un comprtement anormal et que, dans ce contexte là, le résultat attendu n'est pas retrouvé
+Pour couvrir de façon systématique les parcours utilisateur, j'ai d'abord retenu
+trois fonctionnalités :
 
-ex : 
-a) Utilisateur remplit correctement les champs "Username" et "Password" -> mais il n'accède pas au site
-b) Utilisateur remplit ne remplit pas le champ "Username" -> mais il accède pas au site
+1. la connexion de l'utilisateur ;
+2. l'utilisation du panier ;
+3. le paiement.
 
-Pour ce faire, nous avons crée un tableau décrivant la situation de début, les actions à réaliser afin d'emprunter le même chemin et les résultats attendus. Le tableau à retrouver plus bas est la version mise à jour de ce dernier.
+### Types de cas de test
 
+Pour chacune, j'ai distingué deux types de situations :
 
-## Playwright et Page
-Au premier essai j'ai utilisé Playwright comme paramètre au lieu de Page.
+- **Cas normaux** : l'utilisateur agit correctement, et l'application doit produiren le résultat attendu.
+- **Cas d'erreur** : l'utilisateur effectue une action invalide, et l'application doit la refuser en affichant un message.
 
-Ceci a pour désavantage que, en cas d'echec d'un test, le naviagateur n'est pas fermé car il n'atteint jamais le bloc "browser.close()"
+| Type | Exemple | Résultat attendu |
+|------|---------|------------------|
+| Cas normal | L'utilisateur saisit un identifiant et un mot de passe valides | Il accède à la liste des produits |
+| Cas d'erreur | L'utilisateur laisse le champ « Username » vide | La connexion est refusée, avec le message « Username is required » |
 
-Au fur à mesure des tests, du mémoire est alors utilisé en continu afin de garder ces navigateurs ouverts.
+### Rédaction des cas
 
-Encore, Playwright nécessite une définition plus détaillé afin d'appeller le Page nécessaire.
-Ainsi que, une fermeture explicite du navigateur.
+Chaque cas a été décrit dans un tableau avant d'être automatisé : situation de départ,
+actions à réaliser, résultat attendu. Le tableau présenté plus bas en est la version
+à jour, alignée sur les tests du dépôt.
 
-## Structurer
-Nous avons tout d'abord structuré notre code par nos deux types de situation décrite plus haut (à retrouver dans /brouillon).
-Toutefois, dû aux nombreux tests nous avons choisi de plutôt trier par fonctionnalité.
+## Choix techniques
 
-Nous avons également crée un fichier de configuration : conftest.py, qui contient le sité à tester.
+### Fixture `page` plutôt que `playwright`
+
+Mes premiers tests recevaient l'objet `playwright` en paramètre et ouvraient
+eux-mêmes le navigateur. Cette approche présente deux inconvénients :
+
+- **Fermeture non garantie.** Si une vérification échoue, le test s'arrête avant
+  d'atteindre `browser.close()`. Les navigateurs restés ouverts consomment de la
+  mémoire jusqu'à la fin de la session.
+- **Code répétitif.** Chaque test doit lancer le navigateur, créer la page, puis
+  tout fermer explicitement.
+
+J'utilise désormais la fixture `page` du plugin pytest-playwright, qui ouvre et
+ferme le navigateur autour de chaque test, qu'il réussisse ou qu'il échoue.
+
+### Organisation du code
+
+Les tests étaient d'abord répartis selon les deux types de situations. Leur nombre
+augmentant, je les ai regroupés par fonctionnalité, avec un fichier pour la
+connexion, un pour le panier et un pour le paiement.
+
+Le fichier `conftest.py` contient une fixture exécutée avant chaque test, qui ouvre
+le site à tester.
 
 ## Tableau de résultats
 ## Cas de test
@@ -70,51 +90,54 @@ Nous avons également crée un fichier de configuration : conftest.py, qui conti
 
 
 ## Interprétation
-La fonctionnalité le plus à risque est le panier, avec un echec et un choix de fonctionnement ambigu.
-En effet, nous avons rencontré un echec au test P4, à savoir, la possibilité de commander avec un panier vide. 
-Ce scénario ne devrait pas être possible.
 
-Nous aurons également à échanger avec l'équipe technique afin de vérifier le résultat attendu pour le test P3 : ajout d'un article, déconnexion, reconnexion. Nous devons vérfiier que nous souhaitons bien garder un article dans le panier même après déconnexion.
+Le panier est la fonctionnalité où les tests ont révélé des écarts : une anomalie et une règle de fonctionnement à clarifier.
 
-## Ouverture et limites
-Nous n'avons pas réalisé des tests pour l'ensemble des fonctionnalités et pages du site tel que la page "Dynamic catalogue" ou "About" nous avons seulement choisi de cibler pour notre cas d'études trois qui sont critiques pour le bon déroulement de l'expérience utilisateur du site : la connexion, puis l'utilisation du panier et enfin le passage au paiement qui se situent sur la page de connexion, la page "All Items" ou "Products" sur lequel nous arrivons directement après connexion, et les pages liés au panier et paiement.
+**Anomalie (P4).** Il est possible de passer commande avec un panier vide, jusqu'au
+message de confirmation. Ce scénario ne devrait pas être autorisé.
+Voir le rapport d'anomalie n° 1.
 
-## Erreur lors de la conception des tests
-En C5 et C6, tes tests passaient alors qu'ils ne vérifiaient pas le cas annoncé : ils voulaient tester des identifiants incorrects, mais testaient en réalité un champ laissé vide.
+**Règle à clarifier (P3).** Après ajout d'un article, déconnexion puis reconnexion, l'article est conservé dans le panier. En l'absence de spécification, ce comportement a été retenu comme résultat attendu. Il reste à confirmer auprès de l'équipe produit.
 
-**Ce que le test était censé faire**
+## Limites et pistes d'amélioration
 
-`test_nom_utilisateur_faux` devait saisir un identifiant inconnu avec un mot de passe valide, puis vérifier que le site refuse la connexion avec le message « identifiants incorrects ».
+Cette étude se concentre sur trois fonctionnalités critiques du parcours d'achat :
+la connexion, le panier et le paiement.
 
-**Ce qu'il faisait réellement**
+Elle ne couvre pas :
 
-```python
-def test_nom_utilisateur_faux(page: Page) -> None:
-    page.locator('[data-test="username"]').fill("standard")     # identifiant saisi
-                                                                 # mot de passe : jamais saisi
-    page.locator('[data-test="login-button"]').click()
-    expect(page.locator('[data-test="error"]')).to_be_visible()
-```
+- les autres pages et fonctions du site (tri des produits, fiche article, menu « About ») ;
+- les autres comptes de démonstration, notamment `problem_user` ;
+- d'autres navigateurs que Chromium ;
+- les tests d'API.
 
-1. Le test saisit l'identifiant « standard », mais aucun mot de passe.
-2. Le site constate que le mot de passe est vide et s'arrête là. Il affiche « Password is required », sans même examiner l'identifiant.
-3. Le test vérifie seulement qu'un message d'erreur est visible. Il y en a bien un, donc il réussit.
+Prochaines étapes envisagées : relancer la suite avec `problem_user` pour comparer
+les résultats, puis l'exécuter sur Firefox.
 
-C6 est le cas symétrique : le mot de passe est saisi, pas l'identifiant, et le site répond « Username is required ».
 
-**Les deux causes**
+## Leçon retenue : deux tests qui passaient à tort
 
-- **Une donnée manquante** dans la préparation du test : un seul des deux champs était rempli.
-- **Une vérification trop vague** : `to_be_visible()` accepte n'importe quel message d'erreur. C'est elle qui a laissé passer l'oubli.
+En relisant mes tests, j'ai constaté que deux cas d'erreur de connexion (C5 et C6)
+réussissaient sans vérifier le cas annoncé. Ils devaient tester des identifiants
+incorrects, mais testaient en réalité un champ laissé vide.
 
-**La conséquence**
+**Cause.** Chaque test ne remplissait qu'un seul des deux champs. Le site affichait
+donc « Password is required » ou « Username is required », et non le message attendu
+pour des identifiants incorrects. Ma vérification, `to_be_visible()`, se contentait
+de constater qu'un message d'erreur était affiché, quel qu'il soit.
 
-Le cas « identifiants incorrects » n'était en réalité testé par aucun de ces deux tests, alors que ton tableau l'affichait comme couvert. Si le site avait cessé de rejeter les mauvais identifiants, C5 et C6 seraient restés verts. C'est ce qu'on appelle un **faux négatif** : un test qui passe sans protéger contre le défaut qu'il est censé détecter.
+**Conséquence.** Le cas « identifiants incorrects » figurait comme couvert dans mon
+tableau alors qu'aucun test ne le vérifiait réellement.
 
-**La correction**
+**Correction.** Les deux champs sont désormais remplis, et chaque test vérifie le
+texte précis du message :
 
-Remplir les deux champs, et vérifier le texte précis du message. Avec cette seule vérification précise, le test aurait échoué dès le départ et révélé l'oubli.
+​```python
+expect(page.locator('[data-test="error"]')).to_contain_text(
+    "Username and password do not match any user in this service"
+)
+​```
 
-**En conclusion**
-
-En relisant mes tests, j'ai vu que deux cas d'erreur passaient pour une mauvaise raison : il manquait une donnée, et ma vérification se contentait de constater qu'un message d'erreur était affiché. Ceci souligne l'importance de toujours toujours vérifier le contenu précis du résultat attendu, et pas seulement sa présence.
+**Ce que j'en retiens.** Un test doit vérifier le contenu précis du résultat attendu,
+et pas seulement sa présence. Une vérification trop vague peut laisser passer une
+erreur dans le test lui-même.
